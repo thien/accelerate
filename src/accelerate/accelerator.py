@@ -1593,7 +1593,7 @@ class Accelerator:
 
                     if kwargs["cpu_offload"] is not None and kwargs["cpu_offload"].offload_params:
                         # CPUOffloadPolicy is from the new _composable design
-                        fsdp2_kwargs["mp_policy"] = CPUOffloadPolicy(
+                        fsdp2_kwargs["offload_policy"] = CPUOffloadPolicy(
                             # pin_memory= cannot be deduced from FSDP1 args and has to come from user
                             # offloads params is the default behaviour
                         )
