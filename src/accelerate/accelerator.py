@@ -111,7 +111,6 @@ from .utils.constants import FSDP_PYTORCH_VERSION, PROFILE_PATTERN_NAME
 from .utils.modeling import get_state_dict_offloaded_model
 from .utils.other import is_compiled_module
 
-
 if is_deepspeed_available():
     from .utils import (
         DeepSpeedEngineWrapper,
@@ -135,7 +134,6 @@ if is_megatron_lm_available():
     )
 
 from torch.distributed.algorithms.join import Join
-
 
 if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
@@ -1482,6 +1480,7 @@ class Accelerator:
                 )
                 from torch.distributed.fsdp.api import ShardingStrategy
                 from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
+
                 # Check if the model is already a FSDP model due to `Manual Wrapping` and if so,
                 # don't wrap it again
                 # In case the model is already compiled using PyTorch 2.0 and the wrapped model in it
@@ -1528,7 +1527,7 @@ class Accelerator:
                         "reshard_after_forward": True,
                         "mesh": None,
                         "mp_policy": MixedPrecisionPolicy(),
-                        "offload_policy": OffloadPolicy()
+                        "offload_policy": OffloadPolicy(),
                         # shard_placement_fn has been a feature quite recently
                         # "shard_placement_fn": None
                     }
@@ -1581,10 +1580,10 @@ class Accelerator:
                         fsdp2_kwargs["mp_policy"] = MixedPrecisionPolicy(
                             param_dtype=kwargs["mixed_precision"].param_dtype,
                             reduce_dtype=kwargs["mixed_precision"].reduce_dtype,
-                            cast_forward_inputs=kwargs["mixed_precision"].cast_forward_inputs
+                            cast_forward_inputs=kwargs["mixed_precision"].cast_forward_inputs,
                             # output_dtype cannot be deduced from FSDP1 args and has to come from user
                             # buffer_dtype is not available, is it not required for FSDP2?
-                            )
+                        )
 
                     #######
                     # offload policy can be mapped from FSDP1 to FSDP2 arg classes
@@ -1597,13 +1596,13 @@ class Accelerator:
                         fsdp2_kwargs["mp_policy"] = CPUOffloadPolicy(
                             # pin_memory= cannot be deduced from FSDP1 args and has to come from user
                             # offloads params is the default behaviour
-                            )
+                        )
 
                     #######
                     # auto_wrap_policy is not yet supported by FSDP2
                     # therefore manual wrapping has to be done like below
                     #######
-                    for layer in model.model.layers:
+                    for layer in model.model.model.layers:
                         fully_shard(layer, **fsdp2_kwargs)
                     fully_shard(model, **fsdp2_kwargs)
 
@@ -3484,8 +3483,9 @@ class Accelerator:
 
                 state_dict = clone_tensors_for_torch_save(self.unwrap_model(model).state_dict())
         elif self.distributed_type == DistributedType.FSDP:
-            from torch.distributed.fsdp import FullStateDictConfig, StateDictType
+            from torch.distributed.fsdp import FullStateDictConfig
             from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+            from torch.distributed.fsdp import StateDictType
 
             full_state_dict_config = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
             with FSDP.state_dict_type(model, StateDictType.FULL_STATE_DICT, full_state_dict_config):
